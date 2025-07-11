@@ -3,48 +3,48 @@
 
 ---
 
-## 🔥 ¿Qué es Vibratto?
+## 🔥 What is Vibratto?
 
-**Vibratto** no es solo un backend, es una arquitectura musical-orquestada diseñada para artistas modernos.  
-Un ecosistema que conecta música, eventos, comunidad y tecnología de forma **emocional e inteligente**.
+**Vibratto** is more than a backend—it's a musical-orchestrated architecture designed for modern artists.  
+An ecosystem that connects music, events, community, and technology in an **emotional and intelligent** way.
 
-Incluye:
-- 🔌 **Sockets para interacción en tiempo real**
-- 🧠 **Recomendaciones con IA usando OpenAI Embeddings**
-- 💳 **Suscripciones automáticas con Mercado Pago**
-- 📡 **Streams con chat y reacciones**
-- 🔐 **Seguridad avanzada con JWT y logging contextual**
-- 🌐 **Diseñado para escalar hacia microservicios**
+Features include:
+- 🔌 **Real-time interaction via Sockets**
+- 🧠 **AI-powered recommendations using OpenAI Embeddings**
+- 💳 **Automated subscriptions via Mercado Pago**
+- 📡 **Live streams with interactive chat**
+- 🔐 **Advanced security with JWT and contextual logging**
+- 🌐 **Designed to scale towards microservices**
 
 ---
 
-## 🧬 Stack Maestro
+## 🧬 Tech Stack
 
-| Tecnología        | Rol Principal                                            |
+| Technology        | Primary Role                                             |
 |-------------------|----------------------------------------------------------|
-| Node.js + Express | API modular y mantenible                                 |
-| MongoDB + Mongoose| Esquemas dinámicos para música, eventos, usuarios        |
-| Socket.IO         | Transmisión de mensajes en vivo, likes, seguidores       |
-| Mercado Pago SDK  | Gestión de planes y pagos recurrentes                    |
-| OpenAI API        | Recomendaciones semánticas basadas en IA                 |
-| JWT Auth          | Seguridad y control de sesión por token                  |
-| Winston Logger    | Logging profesional con trazabilidad y colores           |
+| Node.js + Express | Modular and maintainable API                             |
+| MongoDB + Mongoose| Dynamic schemas for music, events, users                 |
+| Socket.IO         | Real-time messaging, likes, followers                    |
+| Mercado Pago SDK  | Management of plans and recurring payments               |
+| OpenAI API        | Semantic recommendation engine                           |
+| JWT Auth          | Token-based secure authentication                        |
+| Winston Logger    | Professional logging with context and colors             |
 
 ---
 
-## 📂 Arquitectura de Proyecto
+## 📂 Project Architecture
 
 ```
 /vibratto-backend
 │
-├── controllers/              # Lógica de negocio separada por dominio
+├── controllers/              # Domain-separated business logic
 │   ├── userController.js
 │   ├── reviewController.js
 │   ├── streamingController.js
 │   ├── subscriptionController.js
 │   └── orderController.js
 │
-├── models/                   # Esquemas Mongoose
+├── models/                   # Mongoose schemas
 │   ├── User.js
 │   ├── Event.js
 │   ├── Collab.js
@@ -52,44 +52,44 @@ Incluye:
 │   ├── Streaming.js
 │   └── ChatMessage.js
 │
-├── routes/                   # Rutas agrupadas por dominio
-├── utils/                    # Funciones de utilidad (logger, etc)
+├── routes/                   # Route definitions by domain
+├── utils/                    # Utilities (e.g., logger)
 │   └── logger.js
-├── config/                   # Configuración de terceros
+├── config/                   # Third-party configurations
 │   └── mercadopago.js
-├── middlewares/             # Autenticación y control de acceso
+├── middlewares/             # Auth and access control
 │   └── authMiddleware.js
-├── sockets/                 # Controladores de Socket.IO
+├── sockets/                 # Socket.IO handlers
 │   └── socketManager.js
-└── .env                     # Variables de entorno
+└── .env                     # Environment variables
 ```
 
 ---
 
-## 💬 Streams & Chat en Tiempo Real
+## 💬 Live Streams & Real-Time Chat
 
 ```js
-// Emitir mensaje a todos los usuarios de un stream
+// Emit message to all users in an active stream
 io.to(`stream:${streamId}`).emit("chat:message", messageData);
 
-// Emitir actualización de likes
+// Emit like updates
 io.to(`stream:${streamId}`).emit("stream:likeUpdate", { streamId, totalLikes });
 ```
 
 ---
 
-## 🧠 Recomendaciones con IA (OpenAI)
+## 🧠 AI-Powered Recommendations (OpenAI)
 
 ```js
-const generarEmbedding = async (texto) => {
+const generateEmbedding = async (text) => {
   const response = await openai.createEmbedding({
     model: "text-embedding-ada-002",
-    input: texto
+    input: text
   });
   return response.data.data[0].embedding;
 };
 
-const similitudCoseno = (vecA, vecB) => {
+const cosineSimilarity = (vecA, vecB) => {
   const dot = vecA.reduce((acc, val, i) => acc + val * vecB[i], 0);
   const normA = Math.sqrt(vecA.reduce((acc, val) => acc + val * val, 0));
   const normB = Math.sqrt(vecB.reduce((acc, val) => acc + val * val, 0));
@@ -99,12 +99,12 @@ const similitudCoseno = (vecA, vecB) => {
 
 ---
 
-## 💸 Suscripciones con Mercado Pago
+## 💸 Subscriptions with Mercado Pago
 
 ```js
 const response = await planAPI.create({
   body: {
-    reason: "Membresía Vibratto",
+    reason: "Vibratto Membership",
     auto_recurring: {
       frequency: 1,
       frequency_type: "months",
@@ -122,44 +122,44 @@ const response = await planAPI.create({
 
 ---
 
-## 🛡️ Seguridad & Roles
+## 🛡️ Security & Roles
 
-- Autenticación JWT.
-- Middleware de permisos por ID (`authMiddleware.js`)
-- Logs detallados con contexto de usuario:
+- JWT authentication
+- Middleware for resource-level permission checks
+- Contextual logs for traceability:
 
 ```js
-logger.info(`✏️ Usuario actualizado correctamente [${usuario.id}]`);
+logger.info(`✏️ User successfully updated [${user.id}]`);
 ```
 
 ---
 
-## 🚀 Preparado para Producción
+## 🚀 Production Ready
 
-- Webhooks
-- IA embebida con API propia
-- Modular para microservicios
-- Soporte para Docker
-- Documentación lista para Swagger
+- Webhooks supported
+- Embedded AI with pluggable API
+- Modular for microservices
+- Docker-ready
+- Swagger documentation (optional)
 
 ---
 
-## 🧪 Ejecutar localmente
+## 🧪 Running Locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Requiere `.env` con:
+Required `.env` variables:
 - `MONGODB_URI`
 - `JWT_SECRET`
 - `MP_ACCESS_TOKEN`
-- `OPENAI_API_KEY` (opcional)
+- `OPENAI_API_KEY` (optional)
 
 ---
 
-## 📜 Licencia
+## 📜 License
 
 MIT © Vibratto 2025  
-*Hecho para músicos. Escrito como sinfonía.*
+*Made for musicians. Written like a symphony.*

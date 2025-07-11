@@ -1,148 +1,165 @@
-# 🎸 Vibratto API
-
-**Vibratto** es una plataforma musical para artistas independientes, bandas y fanáticos, diseñada para conectar a músicos con oportunidades reales: desde gigs en bares hasta colaboraciones musicales, streaming y venta de merchandising.
-
-Este repositorio contiene el backend oficial de la aplicación, construido con Node.js, Express y MongoDB, siguiendo una arquitectura escalable y modular.
+# 🎼 Vibratto Backend  
+> *“Don’t play the notes. Play the emotion.”*
 
 ---
 
-## 📦 Características principales
+## 🔥 ¿Qué es Vibratto?
 
-### 🔐 Autenticación
-- Registro y login con JWT
-- Middleware de protección de rutas
-- Autenticación con Google (OAuth 2.0)
+**Vibratto** no es solo un backend, es una arquitectura musical-orquestada diseñada para artistas modernos.  
+Un ecosistema que conecta música, eventos, comunidad y tecnología de forma **emocional e inteligente**.
 
-### 👤 Usuarios
-- Perfiles musicales personalizados
-- Imagen de perfil
-- Roles para artistas, bandas y administradores
-
-### 🎸 Colaboraciones (Collab)
-- Publicación de llamados musicales (busco baterista, se arma banda, etc)
-- Aplicaciones a colaboraciones
-- Chat privado entre participantes
-
-### 📅 Eventos
-- Crear y gestionar conciertos, ensayos y festivales
-- Aplicar a gigs según estilo y experiencia
-- Calendario musical colaborativo
-
-### 💬 Chat en tiempo real
-- Conversaciones entre usuarios
-- Canales por proyecto o evento
-
-### 🛍️ Merchandising
-- Productos musicales (discos, poleras, pedales, etc)
-- Subida de imágenes
-- Gestión de stock y pedidos
-
-### 💎 Premium
-- Lógica inicial de suscripción a plan premium
-- Acceso a beneficios exclusivos (eventos destacados, visibilidad, etc.)
-
-### 📺 Streaming
-- Transmisiones en vivo tipo showcase
-- Canal para mostrar ensayos o eventos online
-
-### 📰 Blog musical
-- Noticias, entrevistas, lanzamientos
-- Panel editorial con CRUD completo
-
-### 🧠 Recomendaciones
-- Motor de sugerencias de bandas, colaboraciones y eventos
-- Basado en intereses, actividad y perfiles afines
+Incluye:
+- 🔌 **Sockets para interacción en tiempo real**
+- 🧠 **Recomendaciones con IA usando OpenAI Embeddings**
+- 💳 **Suscripciones automáticas con Mercado Pago**
+- 📡 **Streams con chat y reacciones**
+- 🔐 **Seguridad avanzada con JWT y logging contextual**
+- 🌐 **Diseñado para escalar hacia microservicios**
 
 ---
 
-## 🧱 Estructura del proyecto
+## 🧬 Stack Maestro
+
+| Tecnología        | Rol Principal                                            |
+|-------------------|----------------------------------------------------------|
+| Node.js + Express | API modular y mantenible                                 |
+| MongoDB + Mongoose| Esquemas dinámicos para música, eventos, usuarios        |
+| Socket.IO         | Transmisión de mensajes en vivo, likes, seguidores       |
+| Mercado Pago SDK  | Gestión de planes y pagos recurrentes                    |
+| OpenAI API        | Recomendaciones semánticas basadas en IA                 |
+| JWT Auth          | Seguridad y control de sesión por token                  |
+| Winston Logger    | Logging profesional con trazabilidad y colores           |
+
+---
+
+## 📂 Arquitectura de Proyecto
 
 ```
-src/
-├── config/             # Configuración general (DB, Multer, Variables)
-├── controllers/        # Lógica de cada recurso
-├── middlewares/        # Autenticación, validación, manejo de errores
-├── models/             # Esquemas de Mongoose
-├── routes/             # Endpoints REST organizados por recurso
-├── utils/              # Logger y herramientas auxiliares
-├── server.js           # Punto de entrada del servidor
-uploads-images/         # Carpeta pública para imágenes
-logs/                   # Logs diarios del sistema
+/vibratto-backend
+│
+├── controllers/              # Lógica de negocio separada por dominio
+│   ├── userController.js
+│   ├── reviewController.js
+│   ├── streamingController.js
+│   ├── subscriptionController.js
+│   └── orderController.js
+│
+├── models/                   # Esquemas Mongoose
+│   ├── User.js
+│   ├── Event.js
+│   ├── Collab.js
+│   ├── Review.js
+│   ├── Streaming.js
+│   └── ChatMessage.js
+│
+├── routes/                   # Rutas agrupadas por dominio
+├── utils/                    # Funciones de utilidad (logger, etc)
+│   └── logger.js
+├── config/                   # Configuración de terceros
+│   └── mercadopago.js
+├── middlewares/             # Autenticación y control de acceso
+│   └── authMiddleware.js
+├── sockets/                 # Controladores de Socket.IO
+│   └── socketManager.js
+└── .env                     # Variables de entorno
 ```
 
 ---
 
-## 🧪 Tecnologías utilizadas
+## 💬 Streams & Chat en Tiempo Real
 
-- **Node.js**
-- **Express.js**
-- **MongoDB Atlas**
-- **Mongoose**
-- **JWT (JSON Web Token)**
-- **Google OAuth**
-- **Multer (uploads)**
-- **Winston (logger profesional)**
-- **Joi (validaciones)**
-- **Cors, dotenv, helmet, etc.**
+```js
+// Emitir mensaje a todos los usuarios de un stream
+io.to(`stream:${streamId}`).emit("chat:message", messageData);
+
+// Emitir actualización de likes
+io.to(`stream:${streamId}`).emit("stream:likeUpdate", { streamId, totalLikes });
+```
 
 ---
 
-## 📂 Scripts útiles
+## 🧠 Recomendaciones con IA (OpenAI)
+
+```js
+const generarEmbedding = async (texto) => {
+  const response = await openai.createEmbedding({
+    model: "text-embedding-ada-002",
+    input: texto
+  });
+  return response.data.data[0].embedding;
+};
+
+const similitudCoseno = (vecA, vecB) => {
+  const dot = vecA.reduce((acc, val, i) => acc + val * vecB[i], 0);
+  const normA = Math.sqrt(vecA.reduce((acc, val) => acc + val * val, 0));
+  const normB = Math.sqrt(vecB.reduce((acc, val) => acc + val * val, 0));
+  return dot / (normA * normB);
+};
+```
+
+---
+
+## 💸 Suscripciones con Mercado Pago
+
+```js
+const response = await planAPI.create({
+  body: {
+    reason: "Membresía Vibratto",
+    auto_recurring: {
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: 1500,
+      currency_id: "CLP",
+      free_trial: {
+        frequency: 1,
+        frequency_type: "months"
+      }
+    },
+    back_url: "https://vibratto.com/thanks"
+  }
+});
+```
+
+---
+
+## 🛡️ Seguridad & Roles
+
+- Autenticación JWT.
+- Middleware de permisos por ID (`authMiddleware.js`)
+- Logs detallados con contexto de usuario:
+
+```js
+logger.info(`✏️ Usuario actualizado correctamente [${usuario.id}]`);
+```
+
+---
+
+## 🚀 Preparado para Producción
+
+- Webhooks
+- IA embebida con API propia
+- Modular para microservicios
+- Soporte para Docker
+- Documentación lista para Swagger
+
+---
+
+## 🧪 Ejecutar localmente
 
 ```bash
-npm run dev       # Ejecuta el servidor con nodemon
-npm start         # Inicia en producción
-npm run lint      # Linter con ESLint
-npm test          # (Pruebas unitarias próximamente)
+npm install
+npm run dev
 ```
 
----
-
-## 🛠️ Variables de entorno
-
-Crea un archivo `.env` con lo siguiente:
-
-```env
-PORT=3940
-MONGO_URI=mongodb://localhost:27017/vibratto
-JWT_SECRET=supersecreto
-JWT_REFRESH_SECRET=supersecreto_refresh
-TOKEN_EXPIRATION=15m
-REFRESH_TOKEN_EXPIRATION=30d
-
-GOOGLE_CLIENT_ID=TU_ID
-GOOGLE_CLIENT_SECRET=TU_SECRETO
-GOOGLE_CALLBACK_URL=http://localhost:3940/api/auth/google/callback
-
-LOG_LEVEL=info
-```
+Requiere `.env` con:
+- `MONGODB_URI`
+- `JWT_SECRET`
+- `MP_ACCESS_TOKEN`
+- `OPENAI_API_KEY` (opcional)
 
 ---
 
-## 📤 Subida de imágenes
+## 📜 Licencia
 
-Los archivos subidos se almacenan en `uploads-images/`. La configuración está en `config/multer.js` y el servidor sirve esa carpeta como pública.
-
----
-
-## 🧠 Ideas futuras
-
-- 🔍 Buscador avanzado por geolocalización, estilo musical, instrumento
-- 📧 Notificaciones por email
-- 🧑‍⚖️ Dashboard administrativo
-- 🧵 Sistema de comentarios en eventos, productos y posts
-- 📊 Estadísticas por banda y colaboraciones
-
----
-
-## 📣 Créditos
-
-Desarrollado por [Ignacio Díaz (Nacho)](https://github.com/nachodiazcode)  
-Inspirado por la necesidad real de conectar músicos en Latinoamérica.  
-¡Con pasión por el arte, la tecnología y la comunidad! 🎶💻
-
----
-
-## 📝 Licencia
-
-Este proyecto está bajo la licencia MIT. Consulta el archivo `LICENSE` para más información.
+MIT © Vibratto 2025  
+*Hecho para músicos. Escrito como sinfonía.*

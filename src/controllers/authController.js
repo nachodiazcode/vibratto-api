@@ -2,153 +2,176 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import config from "../config/config.js";
+import logger from "../utils/logger.js";
+import { generarToken } from "../utils/generarToken.js";
 
-// Función para registrar un nuevo usuario
-const register = async (req, res) => {
+// 🔐 Registrar un nuevo usuario
+export const register = async (req, res) => {
+  const { nombre, email, password, tipo } = req.body;
+  logger.info(`📥 Intentando registrar usuario: ${email}`);
+
   try {
-    const { nombre, email, password, tipo } = req.body;
-
-    // Verificar si el usuario ya existe
-    const existeUsuario = await User.findOne({ email });
-    if (existeUsuario) {
-      return res.status(400).json({ mensaje: "El usuario ya existe" });
+    if (!nombre || !email || !password || !tipo) {
+      logger.warn(`⚠️ Registro fallido: campos incompletos para [${email}].`);
+      return res.status(400).json({ ok: false, mensaje: "Todos los campos son obligatorios." });
     }
 
-    // Hashear contraseña
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const existeUsuario = await User.findOne({ email });
+    if (existeUsuario) {
+      logger.warn(`⚠️ Registro fallido: el usuario [${email}] ya existe.`);
+      return res.status(400).json({ ok: false, mensaje: "El usuario ya existe" });
+    }
 
-    // Crear usuario
-    const nuevoUsuario = new User({
-      nombre,
-      email,
-      password: hashedPassword,
-      tipo,
+    const hashedPassword = await bcrypt.hash(password, 10);
+    logger.debug(`🔐 Contraseña hasheada para [${email}]`);
+
+    const nuevoUsuario = new User({ nombre, email, password: hashedPassword, tipo });
+    await nuevoUsuario.save();
+
+    const token = generarToken(nuevoUsuario);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    await nuevoUsuario.save();
-    res.status(201).json({ mensaje: "Usuario registrado correctamente" });
+    logger.info(`✅ Usuario [${email}] registrado exitosamente.`);
+
+    return res.status(201).json({
+      ok: true,
+      mensaje: "Usuario registrado correctamente",
+      usuario: {
+        id: nuevoUsuario._id,
+        nombre: nuevoUsuario.nombre,
+        email: nuevoUsuario.email,
+        tipo: nuevoUsuario.tipo,
+        creadoEn: nuevoUsuario.createdAt,
+      },
+      token,
+    });
   } catch (error) {
-    res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error al registrar usuario [${email}]: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
-const login = async (req, res) => {
+// 🔓 Iniciar sesión
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+  logger.info(`🔐 Intento de login para: ${email}`);
+
   try {
-    const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ mensaje: "Faltan campos obligatorios" });
+      logger.warn("⚠️ Login fallido: faltan campos obligatorios.");
+      return res.status(400).json({ ok: false, mensaje: "Faltan campos obligatorios" });
     }
 
-    const usuario = await User.findOne({ email });
+    const usuario = await User.findOne({ email }).select("+password");
     if (!usuario) {
-      return res.status(400).json({ mensaje: "Usuario no encontrado" });
+      logger.warn(`❌ Login fallido: usuario [${email}] no encontrado.`);
+      return res.status(400).json({ ok: false, mensaje: "Usuario no encontrado" });
     }
 
     const esCorrecta = await bcrypt.compare(password, usuario.password);
     if (!esCorrecta) {
-      return res.status(400).json({ mensaje: "Contraseña incorrecta" });
+      logger.warn(`❌ Login fallido: contraseña incorrecta para [${email}].`);
+      return res.status(400).json({ ok: false, mensaje: "Contraseña incorrecta" });
     }
 
-    // 🔹 Generar Token
-    const token = jwt.sign(
-      { id: usuario._id, nombre: usuario.nombre, tipo: usuario.tipo },
-      config.jwtSecret,
-      { expiresIn: "7d" }
-    );
+    const token = generarToken(usuario);
 
-    // 🔹 Enviar Token como Cookie Segura
     res.cookie("token", token, {
-      httpOnly: true, // No accesible desde JavaScript en frontend
-      secure: process.env.NODE_ENV === "production", // Solo en HTTPS en producción
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // Expira en 7 días
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    // ✅ **Enviar una única respuesta JSON**
+    logger.info(`✅ Login exitoso del usuario [${email}]`);
+
     return res.json({
+      ok: true,
       mensaje: "Login exitoso",
-      token, // 📌 El token ahora se envía correctamente
-      usuario
+      usuario: {
+        id: usuario._id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        tipo: usuario.tipo,
+      },
+      token,
     });
-
   } catch (error) {
-    return res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error en login de [${email}]: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
-
-// Función para obtener datos del usuario autenticado
-const me = async (req, res) => {
+// 👤 Obtener usuario autenticado
+export const me = async (req, res) => {
   try {
     const usuario = await User.findById(req.user.id).select("-password");
     if (!usuario) {
-      return res.status(404).json({ mensaje: "Usuario no encontrado" });
+      logger.warn(`⚠️ Usuario autenticado no encontrado (ID: ${req.user.id})`);
+      return res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
     }
 
-    res.json(usuario);
+    logger.info(`👤 Datos del usuario [${usuario.email}] recuperados correctamente.`);
+    res.json({ ok: true, usuario });
   } catch (error) {
-    res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error al recuperar perfil: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
-// Función para restablecer contraseña - Enviar email con token (simulado)
-const forgotPassword = async (req, res) => {
+// 📩 Solicitud de recuperación
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  logger.info(`📩 Solicitud de recuperación para: ${email}`);
+
   try {
-    const { email } = req.body;
-
-    console.log("📩 Buscando email en la BD:", email); // 🔹 Depuración en consola
-
     const user = await User.findOne({ email });
-
     if (!user) {
-      return res.status(400).json({ mensaje: "El usuario no existe" });
+      logger.warn(`⚠️ Recuperación fallida: usuario [${email}] no encontrado.`);
+      return res.status(400).json({ ok: false, mensaje: "El usuario no existe" });
     }
 
     const token = jwt.sign({ id: user._id }, config.jwtSecret, { expiresIn: "1h" });
-
     user.resetToken = token;
     await user.save();
 
-    console.log("🔹 Token generado:", token);
+    logger.info(`🛡️ Token de recuperación generado para [${email}]`);
+    // Aquí deberías enviar el correo (servicio aparte)
 
-    res.json({ mensaje: "Token de recuperación generado. Revisa la consola." });
+    res.json({ ok: true, mensaje: "Token de recuperación generado. Revisa tu correo." });
   } catch (error) {
-    res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error en forgotPassword para [${email}]: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
-// Función para cambiar la contraseña con el token de recuperación
-const resetPassword = async (req, res) => {
+// 🔁 Cambiar contraseña usando token
+export const resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+  logger.info("🔁 Procesando cambio de contraseña con token recibido.");
+
   try {
-    const { token, newPassword } = req.body;
-
-    console.log("📥 Token recibido en reset-password:", token);
-    console.log("📥 Nueva contraseña:", newPassword);
-
     const decoded = jwt.verify(token, config.jwtSecret);
-    console.log("✅ Token decodificado:", decoded);
-
     const usuario = await User.findById(decoded.id);
     if (!usuario) {
-      return res.status(400).json({ mensaje: "Token inválido o expirado" });
+      logger.warn("❌ Usuario no encontrado al intentar resetear contraseña");
+      return res.status(400).json({ ok: false, mensaje: "Token inválido o expirado" });
     }
 
-    console.log("✅ Usuario encontrado:", usuario.email);
-
-    const salt = await bcrypt.genSalt(10);
-    usuario.password = await bcrypt.hash(newPassword, salt);
-
+    usuario.password = await bcrypt.hash(newPassword, 10);
+    usuario.resetToken = undefined;
     await usuario.save();
-    console.log("🔹 Contraseña actualizada correctamente.");
 
-    res.json({ mensaje: "Contraseña actualizada correctamente" });
+    logger.info(`✅ Contraseña actualizada para el usuario [${usuario.email}]`);
+    res.json({ ok: true, mensaje: "Contraseña actualizada correctamente" });
   } catch (error) {
-    console.log("❌ Error en resetPassword:", error.message);
-    res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error en resetPassword: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
-
-
-// Exportar funciones
-export { register, login, me, forgotPassword, resetPassword };

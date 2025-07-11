@@ -13,6 +13,8 @@ import premiumRoutes from "./premium.js";
 import blogRoutes from "./blog.js";
 import merchRoutes from "./merch.js"; // ✅ Se mantiene dentro del mismo código
 import bandRoutes from "./bands.js";  // ✅ Nueva ruta de bandas
+import paymentRoutes from "./payment.js";
+import subscriptionRoutes from "./subscription.js";
 
 const router = express.Router();
 
@@ -29,5 +31,8 @@ router.use("/premium", premiumRoutes);
 router.use("/blog", blogRoutes);
 router.use("/merch", merchRoutes); // 📦 Merchandising integrado correctamente
 router.use("/bands", bandRoutes); // ✅ Ahora podemos registrar y ver bandas
+router.use("/payment", paymentRoutes);
+router.use("/subscription", subscriptionRoutes);
+
 
 export default router;

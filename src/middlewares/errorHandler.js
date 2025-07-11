@@ -1,8 +1,16 @@
+import logger from "../utils/logger.js";
+
+// 🛡️ Middleware global para manejo de errores
 const errorHandler = (err, req, res, next) => {
-    console.error("🔥 Error en el servidor:", err.message);
-    res.status(err.status || 500).json({
-        mensaje: err.message || "Error en el servidor",
-        error: process.env.NODE_ENV === "development" ? err.stack : undefined
+    const statusCode = err.statusCode || 500;
+    const mensaje = err.message || "Error interno del servidor";
+
+    logger.error(`🌋 [${req.method}] ${req.originalUrl} → ${mensaje}`);
+
+    res.status(statusCode).json({
+        ok: false,
+        mensaje,
+        detalles: err.details || null,
     });
 };
 

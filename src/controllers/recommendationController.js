@@ -1,94 +1,112 @@
 import User from "../models/User.js";
 import Event from "../models/Event.js";
 import Collab from "../models/Collab.js";
+import logger from "../utils/logger.js";
+import { OpenAI } from "openai";
 
-// 🔹 Función para calcular similitud entre dos listas de intereses
-const calcularSimilitud = (perfil1 = [], perfil2 = []) => {
-  if (perfil1.length === 0 || perfil2.length === 0) return 0; // Evitar errores en listas vacías
-  const interseccion = perfil1.filter(value => perfil2.includes(value));
-  return interseccion.length / Math.sqrt(perfil1.length * perfil2.length);
+// 🔹 Instancia de OpenAI
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// 🔹 Función para generar embedding con OpenAI
+const generarEmbedding = async (texto) => {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-ada-002",
+    input: texto,
+  });
+  return response.data[0].embedding;
 };
 
-// 🔹 Obtener recomendaciones personalizadas mejoradas
+// 🔹 Similitud coseno entre dos vectores
+const similitudCoseno = (vecA, vecB) => {
+  const dot = vecA.reduce((acc, val, i) => acc + val * vecB[i], 0);
+  const normA = Math.sqrt(vecA.reduce((acc, val) => acc + val * val, 0));
+  const normB = Math.sqrt(vecB.reduce((acc, val) => acc + val * val, 0));
+  return dot / (normA * normB);
+};
+
+// 🔹 Obtener recomendaciones IA
 const getRecommendations = async (req, res) => {
   try {
     const usuario = await User.findById(req.user.id).lean();
     if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
-
-    // 📌 Si el usuario no tiene preferencias, no recomendamos nada
-    if (!usuario.generoMusical || usuario.generoMusical.length === 0) {
-      return res.json({ mensaje: "No se encontraron recomendaciones. Agrega tus géneros musicales en tu perfil.", eventos: [], musicos: [] });
+    if (!usuario.generoMusical?.length) {
+      return res.json({ mensaje: "Agrega géneros a tu perfil", eventos: [], musicos: [] });
     }
 
-    // 🔹 **Obtener eventos en la ubicación del usuario, que aún no han pasado**
-    const eventos = await Event.find({ 
-      ubicacion: usuario.ubicacion, 
-      fecha: { $gte: new Date() } // Solo eventos futuros
-    }).lean();
+    const perfilTexto = `Usuario con interés en ${usuario.generoMusical.join(", ")} y ubicación ${usuario.ubicacion}`;
+    const embeddingUsuario = await generarEmbedding(perfilTexto);
 
-    let eventosRecomendados = eventos
-      .map(evento => ({
-        ...evento,
-        puntuacion: calcularSimilitud(usuario.generoMusical, evento.generoMusical || []) + (evento.likes?.length || 0) * 0.1 // Ponderar likes
-      }))
-      .filter(evento => evento.puntuacion > 0) // Filtrar eventos irrelevantes
-      .sort((a, b) => b.puntuacion - a.puntuacion) // Ordenar por relevancia
-      .slice(0, 5); // Máximo 5 eventos recomendados
+    // Eventos
+    const eventos = await Event.find({ fecha: { $gte: new Date() } }).lean();
+    const eventosProcesados = await Promise.all(eventos.map(async (evento) => {
+      const textoEvento = `${evento.titulo || "Evento"} en ${evento.ubicacion}, géneros: ${(evento.generoMusical || []).join(", ")}`;
+      const embeddingEvento = await generarEmbedding(textoEvento);
+      const score = similitudCoseno(embeddingUsuario, embeddingEvento) + ((evento.likes?.length || 0) * 0.1);
+      return { ...evento, puntuacion: score };
+    }));
 
-    // 🔹 **Recomendar músicos con base en intereses y colaboraciones pasadas**
-    const musicos = await User.find({ tipo: "musico", _id: { $ne: usuario._id } }).lean();
-    let musicosRecomendados = musicos
-      .map(musico => ({
-        ...musico,
-        puntuacion: calcularSimilitud(usuario.generoMusical, musico.generoMusical || []) + (musico.likes?.length || 0) * 0.1 // Ponderar likes
-      }))
-      .filter(musico => musico.puntuacion > 0)
+    const eventosRecomendados = eventosProcesados
+      .filter(e => e.puntuacion > 0.5)
       .sort((a, b) => b.puntuacion - a.puntuacion)
       .slice(0, 5);
 
-    // 🔹 **Recomendar músicos con los que ha colaborado antes**
-    const colaboraciones = await Collab.find({ "participantes.usuario": usuario._id }).populate("participantes.usuario", "nombre email").lean();
-    let musicosColaboradores = colaboraciones.flatMap(colab => colab.participantes.map(p => p.usuario))
-      .filter(musico => musico._id.toString() !== usuario._id.toString()); // Excluir al usuario mismo
-    musicosColaboradores = [...new Set(musicosColaboradores)]; // Eliminar duplicados
+    // Músicos
+    const musicos = await User.find({ tipo: "musico", _id: { $ne: usuario._id } }).lean();
+    const musicosProcesados = await Promise.all(musicos.map(async (musico) => {
+      const textoMusico = `Músico ${musico.nombre} toca ${musico.generoMusical?.join(", ")}`;
+      const embeddingMusico = await generarEmbedding(textoMusico);
+      const score = similitudCoseno(embeddingUsuario, embeddingMusico) + ((musico.likes?.length || 0) * 0.1);
+      return { ...musico, puntuacion: score };
+    }));
 
+    const musicosRecomendados = musicosProcesados
+      .filter(m => m.puntuacion > 0.5)
+      .sort((a, b) => b.puntuacion - a.puntuacion)
+      .slice(0, 5);
+
+    // Colaboraciones
+    const colaboraciones = await Collab.find({ "participantes.usuario": usuario._id }).populate("participantes.usuario", "nombre email").lean();
+    const musicosColaboradores = [...new Set(
+      colaboraciones
+        .flatMap(colab => colab.participantes.map(p => p.usuario))
+        .filter(u => u._id.toString() !== usuario._id.toString())
+    )];
+
+    logger.info(`🤖 Recomendaciones IA generadas para usuario [${req.user.id}]`);
     res.json({
-      mensaje: "Recomendaciones generadas con éxito",
+      mensaje: "Recomendaciones generadas con inteligencia artificial",
       eventos: eventosRecomendados,
       musicos: musicosRecomendados,
       musicosColaboradores
     });
-
   } catch (error) {
+    logger.error(`❌ Error en recomendaciones IA para usuario [${req.user.id}]: ${error.message}`);
     res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
   }
 };
 
-// ✅ **Guardar una recomendación como interesante**
+// 🔹 Guardar recomendación
 const saveRecommendation = async (req, res) => {
   try {
-    const { tipo, id } = req.body; // Tipo: "evento" o "musico"
-    
-    if (!["evento", "musico"].includes(tipo)) {
-      return res.status(400).json({ mensaje: "Tipo de recomendación inválido." });
-    }
-
+    const { tipo, id } = req.body;
     const usuario = await User.findById(req.user.id);
     if (!usuario) return res.status(404).json({ mensaje: "Usuario no encontrado" });
 
-    // Agregar la recomendación si no está guardada ya
-    if (!usuario.recomendacionesGuardadas.some(rec => rec.tipo === tipo && rec.id === id)) {
+    const yaGuardada = usuario.recomendacionesGuardadas.some(rec => rec.tipo === tipo && rec.id === id);
+    if (!yaGuardada) {
       usuario.recomendacionesGuardadas.push({ tipo, id });
       await usuario.save();
+      logger.info(`💾 Recomendación guardada [${tipo}] [${id}] por usuario [${req.user.id}]`);
     }
 
-    res.json({ mensaje: "Recomendación guardada con éxito" });
+    res.json({ mensaje: "Recomendación guardada" });
   } catch (error) {
-    res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error al guardar recomendación [${req.user.id}]: ${error.message}`);
+    res.status(500).json({ mensaje: "Error al guardar", error: error.message });
   }
 };
 
-// ✅ **Obtener recomendaciones guardadas**
+// 🔹 Obtener guardadas
 const getSavedRecommendations = async (req, res) => {
   try {
     const usuario = await User.findById(req.user.id).populate("recomendacionesGuardadas.id").lean();
@@ -96,11 +114,12 @@ const getSavedRecommendations = async (req, res) => {
 
     res.json(usuario.recomendacionesGuardadas);
   } catch (error) {
-    res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error al obtener guardadas [${req.user.id}]: ${error.message}`);
+    res.status(500).json({ mensaje: "Error al obtener", error: error.message });
   }
 };
 
-// ✅ **Eliminar una recomendación guardada**
+// 🔹 Eliminar recomendación guardada
 const deleteSavedRecommendation = async (req, res) => {
   try {
     const usuario = await User.findById(req.user.id);
@@ -109,16 +128,17 @@ const deleteSavedRecommendation = async (req, res) => {
     usuario.recomendacionesGuardadas = usuario.recomendacionesGuardadas.filter(rec => rec.id.toString() !== req.params.id);
     await usuario.save();
 
-    res.json({ mensaje: "Recomendación eliminada correctamente" });
+    logger.info(`🗑️ Recomendación eliminada [${req.params.id}] por usuario [${req.user.id}]`);
+    res.json({ mensaje: "Recomendación eliminada" });
   } catch (error) {
-    res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error al eliminar recomendación [${req.user.id}]: ${error.message}`);
+    res.status(500).json({ mensaje: "Error al eliminar", error: error.message });
   }
 };
 
-// 🔹 **Exportamos las funciones**
-export { 
-  getRecommendations, 
-  saveRecommendation, 
-  getSavedRecommendations, 
-  deleteSavedRecommendation 
+export {
+  getRecommendations,
+  saveRecommendation,
+  getSavedRecommendations,
+  deleteSavedRecommendation
 };

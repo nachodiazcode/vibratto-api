@@ -1,68 +1,103 @@
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import logger from "../utils/logger.js";
 
-// Crear una orden de compra
+// 🛒 Crear una nueva orden
 export const crearOrden = async (req, res) => {
   try {
     const { producto_id, cantidad, metodo_pago } = req.body;
+    const userId = req.user.id;
 
-    // Verificar si el producto existe
+    if (!producto_id || !cantidad || !metodo_pago) {
+      return res.status(400).json({ ok: false, mensaje: "Faltan campos obligatorios" });
+    }
+
     const producto = await Product.findById(producto_id);
-    if (!producto) return res.status(404).json({ message: "Producto no encontrado" });
+    if (!producto) {
+      logger.warn(`⚠️ Producto [${producto_id}] no encontrado por [${userId}]`);
+      return res.status(404).json({ ok: false, mensaje: "Producto no encontrado" });
+    }
 
-    // Calcular el total
+    if (cantidad <= 0) {
+      return res.status(400).json({ ok: false, mensaje: "Cantidad inválida" });
+    }
+
     const total = producto.precio * cantidad;
 
-    // Crear la orden
-    const nuevaOrden = new Order({
-      producto: producto_id,
-      comprador: req.user.id, 
+    const orden = new Order({
+      producto: producto._id,
+      comprador: userId,
       cantidad,
       total,
-      metodo_pago
+      metodo_pago,
     });
 
-    await nuevaOrden.save();
-    res.status(201).json({ message: "Orden creada exitosamente", orden: nuevaOrden });
+    await orden.save();
+
+    logger.info(`🛒 Orden creada por [${userId}] para producto [${producto_id}]`);
+    res.status(201).json({ ok: true, mensaje: "Orden creada exitosamente", orden });
   } catch (error) {
-    res.status(500).json({ message: "Error al crear la orden", error });
+    logger.error(`❌ Error en crearOrden por [${req.user.id}]: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error al crear orden", error: error.message });
   }
 };
 
-// Listar órdenes de un usuario
+// 📦 Listar todas las órdenes del usuario autenticado
 export const listarOrdenes = async (req, res) => {
   try {
-    const ordenes = await Order.find({ comprador: req.user.id }).populate("producto", "nombre precio");
-    res.json(ordenes);
+    const userId = req.user.id;
+    const ordenes = await Order.find({ comprador: userId })
+      .sort({ creadoEn: -1 })
+      .populate("producto", "nombre precio");
+
+    logger.info(`📦 [${userId}] listó ${ordenes.length} órdenes`);
+    res.json({ ok: true, ordenes });
   } catch (error) {
-    res.status(500).json({ message: "Error al obtener las órdenes", error });
+    logger.error(`❌ Error en listarOrdenes para [${req.user.id}]: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error al obtener órdenes", error: error.message });
   }
 };
 
-// Obtener detalles de una orden
+// 🔍 Obtener detalle de una orden
 export const obtenerOrden = async (req, res) => {
   try {
     const orden = await Order.findById(req.params.id).populate("producto", "nombre precio");
-    if (!orden) return res.status(404).json({ message: "Orden no encontrada" });
+    if (!orden) {
+      logger.warn(`⚠️ Orden [${req.params.id}] no encontrada`);
+      return res.status(404).json({ ok: false, mensaje: "Orden no encontrada" });
+    }
 
-    res.json(orden);
+    if (!orden.comprador.equals(req.user.id)) {
+      logger.warn(`🚫 Acceso no autorizado a orden [${req.params.id}] por [${req.user.id}]`);
+      return res.status(403).json({ ok: false, mensaje: "No autorizado" });
+    }
+
+    logger.info(`📄 Orden [${req.params.id}] consultada por [${req.user.id}]`);
+    res.json({ ok: true, orden });
   } catch (error) {
-    res.status(500).json({ message: "Error al obtener la orden", error });
+    logger.error(`❌ Error en obtenerOrden [${req.params.id}]: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error al obtener orden", error: error.message });
   }
 };
 
-// Actualizar el estado de una orden (por ejemplo, de "pendiente" a "pagado")
+// 🔁 Actualizar estado de la orden (Admin o sistema)
 export const actualizarEstadoOrden = async (req, res) => {
   try {
     const { estado } = req.body;
     const orden = await Order.findById(req.params.id);
-    if (!orden) return res.status(404).json({ message: "Orden no encontrada" });
+
+    if (!orden) {
+      logger.warn(`⚠️ Orden [${req.params.id}] no encontrada para actualización`);
+      return res.status(404).json({ ok: false, mensaje: "Orden no encontrada" });
+    }
 
     orden.estado = estado;
     await orden.save();
 
-    res.json({ message: "Estado de la orden actualizado", orden });
+    logger.info(`🔄 Orden [${orden._id}] actualizada a '${estado}' por [${req.user.id}]`);
+    res.json({ ok: true, mensaje: "Estado de la orden actualizado", orden });
   } catch (error) {
-    res.status(500).json({ message: "Error al actualizar la orden", error });
+    logger.error(`❌ Error en actualizarEstadoOrden [${req.params.id}]: ${error.message}`);
+    res.status(500).json({ ok: false, mensaje: "Error al actualizar orden", error: error.message });
   }
 };

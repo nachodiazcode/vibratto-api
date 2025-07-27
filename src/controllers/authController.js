@@ -12,19 +12,17 @@ export const register = async (req, res) => {
 
   try {
     if (!nombre || !email || !password || !tipo) {
-      logger.warn(`⚠️ Registro fallido: campos incompletos para [${email}].`);
+      logger.warn(`❌ Registro fallido - Datos incompletos para: ${email}`);
       return res.status(400).json({ ok: false, mensaje: "Todos los campos son obligatorios." });
     }
 
     const existeUsuario = await User.findOne({ email });
     if (existeUsuario) {
-      logger.warn(`⚠️ Registro fallido: el usuario [${email}] ya existe.`);
+      logger.warn(`⚠️ Registro fallido - Usuario ya existe: ${email}`);
       return res.status(400).json({ ok: false, mensaje: "El usuario ya existe" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    logger.debug(`🔐 Contraseña hasheada para [${email}]`);
-
+    const hashedPassword = await bcrypt.hash(password, 12); // 🔐 fuerza de hash más segura
     const nuevoUsuario = new User({ nombre, email, password: hashedPassword, tipo });
     await nuevoUsuario.save();
 
@@ -37,7 +35,7 @@ export const register = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    logger.info(`✅ Usuario [${email}] registrado exitosamente.`);
+    logger.info(`✅ Usuario registrado: ${email}`);
 
     return res.status(201).json({
       ok: true,
@@ -53,7 +51,7 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     logger.error(`❌ Error al registrar usuario [${email}]: ${error.message}`);
-    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
+    return res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
@@ -64,20 +62,20 @@ export const login = async (req, res) => {
 
   try {
     if (!email || !password) {
-      logger.warn("⚠️ Login fallido: faltan campos obligatorios.");
+      logger.warn("⚠️ Login fallido - Faltan campos obligatorios.");
       return res.status(400).json({ ok: false, mensaje: "Faltan campos obligatorios" });
     }
 
     const usuario = await User.findOne({ email }).select("+password");
     if (!usuario) {
-      logger.warn(`❌ Login fallido: usuario [${email}] no encontrado.`);
-      return res.status(400).json({ ok: false, mensaje: "Usuario no encontrado" });
+      logger.warn(`❌ Login fallido - Usuario no encontrado: ${email}`);
+      return res.status(400).json({ ok: false, mensaje: "Correo o contraseña incorrectos" });
     }
 
-    const esCorrecta = await bcrypt.compare(password, usuario.password);
-    if (!esCorrecta) {
-      logger.warn(`❌ Login fallido: contraseña incorrecta para [${email}].`);
-      return res.status(400).json({ ok: false, mensaje: "Contraseña incorrecta" });
+    const passwordValida = await bcrypt.compare(password, usuario.password);
+    if (!passwordValida) {
+      logger.warn(`❌ Login fallido - Contraseña incorrecta para: ${email}`);
+      return res.status(400).json({ ok: false, mensaje: "Correo o contraseña incorrectos" });
     }
 
     const token = generarToken(usuario);
@@ -89,9 +87,9 @@ export const login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    logger.info(`✅ Login exitoso del usuario [${email}]`);
+    logger.info(`✅ Login exitoso: ${email}`);
 
-    return res.json({
+    return res.status(200).json({
       ok: true,
       mensaje: "Login exitoso",
       usuario: {
@@ -103,12 +101,12 @@ export const login = async (req, res) => {
       token,
     });
   } catch (error) {
-    logger.error(`❌ Error en login de [${email}]: ${error.message}`);
-    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error durante login de [${email}]: ${error.message}`);
+    return res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
-// 👤 Obtener usuario autenticado
+// 👤 Obtener perfil autenticado
 export const me = async (req, res) => {
   try {
     const usuario = await User.findById(req.user.id).select("-password");
@@ -117,23 +115,23 @@ export const me = async (req, res) => {
       return res.status(404).json({ ok: false, mensaje: "Usuario no encontrado" });
     }
 
-    logger.info(`👤 Datos del usuario [${usuario.email}] recuperados correctamente.`);
-    res.json({ ok: true, usuario });
+    logger.info(`👤 Usuario autenticado: ${usuario.email}`);
+    return res.status(200).json({ ok: true, usuario });
   } catch (error) {
     logger.error(`❌ Error al recuperar perfil: ${error.message}`);
-    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
+    return res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
 // 📩 Solicitud de recuperación
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
-  logger.info(`📩 Solicitud de recuperación para: ${email}`);
+  logger.info(`📩 Solicitud de recuperación: ${email}`);
 
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      logger.warn(`⚠️ Recuperación fallida: usuario [${email}] no encontrado.`);
+      logger.warn(`⚠️ Recuperación fallida - Usuario no encontrado: ${email}`);
       return res.status(400).json({ ok: false, mensaje: "El usuario no existe" });
     }
 
@@ -141,37 +139,37 @@ export const forgotPassword = async (req, res) => {
     user.resetToken = token;
     await user.save();
 
-    logger.info(`🛡️ Token de recuperación generado para [${email}]`);
-    // Aquí deberías enviar el correo (servicio aparte)
+    logger.info(`📧 Token de recuperación generado para: ${email}`);
+    // Aquí deberías enviar el correo con el token (enlace para reset)
 
-    res.json({ ok: true, mensaje: "Token de recuperación generado. Revisa tu correo." });
+    return res.json({ ok: true, mensaje: "Token de recuperación enviado. Revisa tu correo." });
   } catch (error) {
-    logger.error(`❌ Error en forgotPassword para [${email}]: ${error.message}`);
-    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
+    logger.error(`❌ Error en forgotPassword [${email}]: ${error.message}`);
+    return res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };
 
-// 🔁 Cambiar contraseña usando token
+// 🔁 Cambiar contraseña con token
 export const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
-  logger.info("🔁 Procesando cambio de contraseña con token recibido.");
+  logger.info("🔁 Intento de cambio de contraseña con token.");
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret);
     const usuario = await User.findById(decoded.id);
     if (!usuario) {
-      logger.warn("❌ Usuario no encontrado al intentar resetear contraseña");
+      logger.warn("❌ Token inválido o usuario no encontrado.");
       return res.status(400).json({ ok: false, mensaje: "Token inválido o expirado" });
     }
 
-    usuario.password = await bcrypt.hash(newPassword, 10);
+    usuario.password = await bcrypt.hash(newPassword, 12);
     usuario.resetToken = undefined;
     await usuario.save();
 
-    logger.info(`✅ Contraseña actualizada para el usuario [${usuario.email}]`);
-    res.json({ ok: true, mensaje: "Contraseña actualizada correctamente" });
+    logger.info(`✅ Contraseña actualizada para: ${usuario.email}`);
+    return res.json({ ok: true, mensaje: "Contraseña actualizada correctamente" });
   } catch (error) {
     logger.error(`❌ Error en resetPassword: ${error.message}`);
-    res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
+    return res.status(500).json({ ok: false, mensaje: "Error en el servidor", error: error.message });
   }
 };

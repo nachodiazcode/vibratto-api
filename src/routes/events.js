@@ -1,21 +1,42 @@
 import express from "express";
-import { 
-  getRecommendations, 
-  saveRecommendation, 
-  getSavedRecommendations, 
-  deleteSavedRecommendation
-} from "../controllers/recommendationController.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
+import {
+  getEvents,
+  getEventById,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  processPayment,
+  paymentWebhook,
+  searchEvents,
+  createMultipleEvents,
+  deleteAllEvents,
+  toggleLikeEvent
+} from "../controllers/eventsController.js";
 
 const router = express.Router();
 
-// 🔹 **Endpoint de búsqueda de recomendaciones**
-router.get("/search", authMiddleware, getRecommendations); // ✅ Asegurar que `/search` va antes que `/:id`
+// 🔍 Búsqueda avanzada (debe ir antes que "/:id")
+router.get("/search", authMiddleware, searchEvents);
 
-// 🔹 **CRUD de recomendaciones**
-router.get("/", authMiddleware, getRecommendations);
-router.get("/saved", authMiddleware, getSavedRecommendations);
-router.post("/save", authMiddleware, saveRecommendation);
-router.delete("/saved/:id", authMiddleware, deleteSavedRecommendation); // ✅ Eliminar una recomendación guardada
+// 📄 CRUD eventos
+router.get("/", authMiddleware, getEvents);             // Obtener todos
+router.get("/:id", authMiddleware, getEventById);       // Obtener uno
+router.post("/", authMiddleware, createEvent);          // Crear uno
+router.put("/:id", authMiddleware, updateEvent);        // Editar uno
+router.delete("/:id", authMiddleware, deleteEvent);     // Eliminar uno
+
+// ❤️ Like / Dislike
+router.patch("/:id/like", authMiddleware, toggleLikeEvent);
+
+// 📦 Crear múltiples eventos
+router.post("/bulk", authMiddleware, createMultipleEvents);
+
+// 🗑️ Eliminar todos (admin/dev)
+router.delete("/", authMiddleware, deleteAllEvents);
+
+// 💳 Pagos con Mercado Pago
+router.post("/pago", authMiddleware, processPayment);
+router.post("/webhook", paymentWebhook); // Público (debe recibir desde Mercado Pago)
 
 export default router;

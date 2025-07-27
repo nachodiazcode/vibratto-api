@@ -1,4 +1,3 @@
-// routes/collab.js
 import express from "express";
 import {
   getAllCollabs,
@@ -18,18 +17,21 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// ✨ Aquí defines tus rutas:
-router.get("/", getAllCollabs);
-router.get("/:id", getCollabById);
-router.post("/", authMiddleware, createCollab);
-router.post("/:id/join", authMiddleware, joinCollab);
-router.post("/:id/message", authMiddleware, sendMessageInCollab);
-router.patch("/:id/close", authMiddleware, closeCollab);
+// 📂 Colaboraciones
+router.get("/", getAllCollabs);                     // Ver todas
+router.get("/:id", getCollabById);                  // Ver una
+router.post("/", authMiddleware, createCollab);     // Crear
+router.post("/:id/join", authMiddleware, joinCollab); // Unirse
+router.post("/:id/messages", authMiddleware, sendMessageInCollab); // Enviar mensaje
+router.patch("/:id/close", authMiddleware, closeCollab);           // Cerrar colaboración
+router.delete("/:id", authMiddleware, deleteCollab);               // Eliminar
+router.patch("/:id/like", authMiddleware, toggleLikeCollab);       // Like / Unlike
+
+// 🗳 Votaciones
+router.post("/:id/votes", authMiddleware, createVoteInCollab);
+
+// 🔔 Notificaciones
 router.get("/notificaciones/user", authMiddleware, getNotifications);
 router.patch("/notificaciones/mark", authMiddleware, markNotificationsAsRead);
-router.post("/:id/vote", authMiddleware, createVoteInCollab);
-router.delete("/:id", authMiddleware, deleteCollab);
-router.post("/:id/like", authMiddleware, toggleLikeCollab);
 
-// ✅ ESTA LÍNEA ES FUNDAMENTAL
 export default router;

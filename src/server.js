@@ -107,8 +107,10 @@ const swaggerDocs = swaggerJsDoc(swaggerOptions);
 // 🔧 Middlewares globales
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({ origin: config.allowedOrigins }));
-app.use(cookieParser());
+app.use(cors({
+  origin: "http://localhost:3000",  // Cambia si tu frontend está en otro host
+  credentials: true                 // NECESARIO para que se envíen cookies
+}));app.use(cookieParser());
 
 // 📂 Rutas
 app.use("/api", routes);

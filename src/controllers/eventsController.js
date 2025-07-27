@@ -10,17 +10,21 @@ if (!global.mercadoPagoInstance) {
 }
 const mercadoPago = global.mercadoPagoInstance;
 
+
+
 // 🔹 Obtener todos los eventos
 const getEvents = async (req, res) => {
   try {
-    const events = await Event.find()
-      .populate("artista", "nombre email")
-      .populate("cliente", "nombre email");
+    const userId = req.user?.id || "anon";
 
-    logger.info(`📄 Eventos obtenidos por [${req.user.id}]`);
+    const events = await Event.find()
+      .populate({ path: "artista", select: "nombre email" })
+      .populate({ path: "cliente", select: "nombre email", options: { strictPopulate: false } });
+
+    logger.info(`📄 Eventos obtenidos por [${userId}] - total: ${events.length}`);
     res.json(events);
   } catch (error) {
-    logger.error(`❌ Error en getEvents por [${req.user.id}]: ${error.message}`);
+    logger.error(`❌ Error en getEvents por [${req.user?.id || "anon"}]: ${error.message}`);
     res.status(500).json({ mensaje: "Error en el servidor", error: error.message });
   }
 };

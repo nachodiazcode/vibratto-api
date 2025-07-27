@@ -4,6 +4,6 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/", authMiddleware, getRecommendations); // Obtener recomendaciones basadas en el perfil del usuario
+router.get("/", authMiddleware, getRecommendations);
 
-export default router;
+export default router; // ✅ <--- AGREGÁ esto
